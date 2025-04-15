@@ -9,8 +9,6 @@ from PIL import Image, ImageDraw, ImageFont
 import io
 import inspect
 
-# TODO: Check all variables with the name 'date' and change the name ALSO IN CHICKENBOT!
-
 def wrap_method(method):
     def wrapped(self, *args, **kwargs): 
         previously_keep_open = self._keep_open
@@ -19,7 +17,7 @@ def wrap_method(method):
         self._call_stack.append(method.__name__)
 
         result = method(self, *args, **kwargs)
-        
+
         self._call_stack.pop()
         if not self._call_stack:
             self.handle_connection(self._keep_open)
@@ -155,7 +153,7 @@ class DailyTradeBot(metaclass=AutoPostCallMeta):
         except ValueError:
             return False
         
-    def add_message(self, df, username, message): # TODO: add_row is now add_message
+    def add_message(self, df, username, message):
         new_row = pd.DataFrame([[username, message]], columns=df.columns)
         return pd.concat([df, new_row], ignore_index=True)
     
@@ -174,7 +172,7 @@ class DailyTradeBot(metaclass=AutoPostCallMeta):
         return (post_id, post_date)
     
     def extract_commands(self, text):
-        text = text.replace(r"\\","") # TODO: test!        
+        text = text.replace(r"\\","")       
         commands = []
 
         pattern = re.compile(r'\[\s*(sell|buy)\s+(\d+|all)(?:\s+r/(\w+))?\s*\]|\[\s*(loan|pay)\s+(\d+|all)\s*\]|\[\s*(exit)\s*\]|\[(.*?)\]')
@@ -906,6 +904,20 @@ class DailyTradeBot(metaclass=AutoPostCallMeta):
         # Save or display
         final_img.save("subreddit summary.png")   
 
+    def display_table(self,table_name):
+        self.cursor().execute("SELECT name FROM sqlite_master WHERE type='table'")
+        tables = self.cursor().fetchall()
+        for table in tables:
+            if table[0] != table_name:
+                continue
+            print(f"Table: {table[0]}")
+            self.cursor().execute(f"SELECT * FROM {table[0]}")
+            rows = self.cursor().fetchall()
+            for row in rows:
+                print(row)
+            print("-" * 40)
+        self.conn().close()
+
     def display_all_tables(self):
         self.cursor().execute("SELECT name FROM sqlite_master WHERE type='table'")
         tables = self.cursor().fetchall()
@@ -923,8 +935,8 @@ class DailyTradeBot(metaclass=AutoPostCallMeta):
         print(f"Getting post numbers of the r/{subreddit_name} subreddit from the past few days.")
 
         for i in range(6):
-            date = datetime.today() - timedelta(days=i)
-            date_text = f"{date.year}-{date.month}-{date.day}"
+            handle_date = datetime.today() - timedelta(days=i)
+            date_text = f"{handle_date.year}-{handle_date.month}-{handle_date.day}"
             print(f"{date_text}: {str(self.get_posts_before_date(subreddit_name, date_text))}")
 
     def split_change_log(self, text, max_length=9600):
@@ -1001,8 +1013,6 @@ class DailyTradeBot(metaclass=AutoPostCallMeta):
         self.create_virtual_worth_table()
         self.create_trend_image()
 
-        self.conn().close()    
-
         change_log = self.format_messages(df)
         
         print('\n\n\n\n\n\n\n CHANGELOG')
@@ -1013,45 +1023,44 @@ class DailyTradeBot(metaclass=AutoPostCallMeta):
     
     def publish_post(self, change_log):
         explanation_text = '''You are looking at the first fully bot-run daily game: **DailyTrade**!\n\n
-    **How It Works**\n\n
-    The rules may seem complicated, but it’s actually pretty simple.\n\n
-    DailyTrade is a stock trading game—but instead of companies, you’re investing in **subreddits**! Stock values are based on how many posts appeared in that subreddit the previous day. You can join by simply announcing your first trade. You get a free starting budget of **1000 gems** to trade with.\n\n
-    **Example Trade**\n\n
-    - On **Day 1**, I buy **400 gems** worth of r/notinteresting stock.\n
-    - Between **Day 0 and Day 1**, there were **50 posts** on r/notinteresting.\n
-    - On **Day 3**, I decide to sell my stock.\n
-    - Between **Day 2 and Day 3**, there were **100 posts** on r/notinteresting.\n
-    - Since the number of posts **doubled**, my stock value doubles as well—I get **800 gems** back.\n
-    Of course, stock values can go down too—if the number of posts drops, you’ll lose gems when you sell.
-    \n\n---\n
-    **Bot Commands**\n\n
-    The bot reads and processes comments, so please follow these formatting rules carefully.\n\n
-    - **Always use square brackets** [ ] around commands so the bot knows you’re talking to it.\n
-    - You can include **regular text** in your comment too—the bot will only process text inside brackets.\n
-    - Commands can be **chained** (e.g., [buy 400 r/dailygames] blab la [sell 200 r/notinteresting]), and they will be executed in order.\n
-    **Available Commands**\n\n
-    - **Buy Stocks**: [buy AMOUNT r/SUBREDDIT]. Example: [buy 400 r/notinteresting] buys 400 gems worth of r/notinteresting stock. Your stocks are valued based on when *you* buy them (even if someone else buys later at a different price).\n
-    - **Sell Stocks**: [sell AMOUNT r/SUBREDDIT]. Example: [sell 400 r/notinteresting] sells 400 stocks of r/notinteresting at the current rate. You can also sell everything of one subreddit at once: [sell all r/notinteresting]. You can even sell all of your stocks of all subreddits using [sell all].\n
-    - **Take a Loan**: [loan AMOUNT]. Example: [loan 1000] takes a 1000-gem loan. Interest is **5% per day**, deducted automatically at the start of each day.\n
-    - **Repay a Loan**: [pay AMOUNT]. Example: [pay 500] pays back 500 gems toward your loan. You can also repay everything at once: [pay all].
-    - **Stop the game**: [exit] causes the bot to delete all of your information. You can always join again later.
-    \n\n---\n
-    **Game Rules & Notes**
-    - You **cannot** buy extra stocks from a subreddit if you already own some. You must sell all your stocks in that subreddit first.\n
-    - You can only buy stocks from certain subreddits, you can find them in one of the images. You can request additional subreddits by contacting me (or responding to this post).\n
-    - **Stock values update at 5 AM GMT** each day, based on the previous 24 hours. Posting time may vary slightly, but calculations are always consistent.\n
-    - **You can’t influence stock prices by posting** in a subreddit yourself (your own posts are ignored in the post count). Any attempts at ‘insider trading’—like using an alt account to inflate stock values—will be investigated by the Reddit IRS (a.k.a. me).\n
-    - You can only trade in **whole** number of gems and stocks.\n
-    Let me know if you have any questions. Happy trading!\n\n
-    ^(This post, and everything in it, was created automatically by a bot. If you think I made a mistake, respond to this post. This will summon Aart, my creator. The code for this bot is fully open source, and can be found [here](https://github.com/AartvB/DailyTrade).)
-    '''
+**How It Works**\n\n
+The rules may seem complicated, but it’s actually pretty simple.\n\n
+DailyTrade is a stock trading game—but instead of companies, you’re investing in **subreddits**! Stock values are based on how many posts appeared in that subreddit the previous day. You can join by simply announcing your first trade. You get a free starting budget of **1000 gems** to trade with.\n\n
+**Example Trade**\n\n
+- On **Day 1**, I buy **400 gems** worth of r/notinteresting stock.\n
+- Between **Day 0 and Day 1**, there were **50 posts** on r/notinteresting.\n
+- On **Day 3**, I decide to sell my stock.\n
+- Between **Day 2 and Day 3**, there were **100 posts** on r/notinteresting.\n
+- Since the number of posts **doubled**, my stock value doubles as well—I get **800 gems** back.\n
+Of course, stock values can go down too—if the number of posts drops, you’ll lose gems when you sell.
+\n\n---\n
+**Bot Commands**\n\n
+The bot reads and processes comments, so please follow these formatting rules carefully.\n\n
+- **Always use square brackets** [ ] around commands so the bot knows you’re talking to it.\n
+- You can include **regular text** in your comment too—the bot will only process text inside brackets.\n
+- Commands can be **chained** (e.g., [buy 400 r/dailygames] blab la [sell 200 r/notinteresting]), and they will be executed in order.\n
+**Available Commands**\n\n
+- **Buy Stocks**: [buy AMOUNT r/SUBREDDIT]. Example: [buy 400 r/notinteresting] buys 400 gems worth of r/notinteresting stock. Your stocks are valued based on when *you* buy them (even if someone else buys later at a different price).\n
+- **Sell Stocks**: [sell AMOUNT r/SUBREDDIT]. Example: [sell 400 r/notinteresting] sells 400 stocks of r/notinteresting at the current rate. You can also sell everything of one subreddit at once: [sell all r/notinteresting]. You can even sell all of your stocks of all subreddits using [sell all].\n
+- **Take a Loan**: [loan AMOUNT]. Example: [loan 1000] takes a 1000-gem loan. Interest is **5% per day**, deducted automatically at the start of each day.\n
+- **Repay a Loan**: [pay AMOUNT]. Example: [pay 500] pays back 500 gems toward your loan. You can also repay everything at once: [pay all].
+- **Stop the game**: [exit] causes the bot to delete all of your information. You can always join again later.
+\n\n---\n
+**Game Rules & Notes**
+- You **cannot** buy extra stocks from a subreddit if you already own some. You must sell all your stocks in that subreddit first.\n
+- You can only buy stocks from certain subreddits, you can find them in one of the images. You can request additional subreddits by contacting me (or responding to this post).\n
+- **Stock values update at 5 AM GMT** each day, based on the previous 24 hours. Posting time may vary slightly, but calculations are always consistent.\n
+- **You can’t influence stock prices by posting** in a subreddit yourself (your own posts are ignored in the post count). Any attempts at ‘insider trading’—like using an alt account to inflate stock values—will be investigated by the Reddit IRS (a.k.a. me).\n
+- You can only trade in **whole** number of gems and stocks.\n
+Let me know if you have any questions. Happy trading!\n\n
+^(This post, and everything in it, was created automatically by a bot. If you think I made a mistake, respond to this post. This will summon Aart, my creator. The code for this bot is fully open source, and can be found [here](https://github.com/AartvB/DailyTrade).)'''
         self.cursor().execute("""
             SELECT COUNT(post_id)
             FROM posts
             LIMIT 1
         """)
         post_count = self.cursor().fetchone()[0] + 1
-        
+
         post_id, _ = self.get_latest_post()
         submission = self.reddit.submission(id=post_id)
 
@@ -1121,4 +1130,5 @@ class DailyTradeBot(metaclass=AutoPostCallMeta):
 
 bot = DailyTradeBot()
 change_log = bot.run_bot(keep_open=True)
-bot.publish_post()
+bot.publish_post(change_log)
+#bot.display_table('posts')
