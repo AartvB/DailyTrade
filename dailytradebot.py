@@ -172,7 +172,7 @@ class DailyTradeBot(metaclass=AutoPostCallMeta):
         return (post_id, post_date)
     
     def extract_commands(self, text):
-        text = text.replace(r"\\","")       
+        text = text.replace("\\","")
         commands = []
 
         pattern = re.compile(r'\[\s*(sell|buy)\s+(\d+|all)(?:\s+r/(\w+))?\s*\]|\[\s*(loan|pay)\s+(\d+|all)\s*\]|\[\s*(exit)\s*\]|\[(.*?)\]')
