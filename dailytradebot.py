@@ -7,7 +7,8 @@ import shutil
 import matplotlib.pyplot as plt
 from PIL import Image, ImageDraw, ImageFont
 import io
-import inspect
+import schedule
+import time
 
 def wrap_method(method):
     def wrapped(self, *args, **kwargs): 
@@ -1128,7 +1129,13 @@ Let me know if you have any questions. Happy trading!\n\n
             self.conn().commit()
         print("Finished!")
 
-bot = DailyTradeBot()
-change_log = bot.run_bot(keep_open=True)
-bot.publish_post(change_log)
-#bot.display_table('posts')
+def run():
+    bot = DailyTradeBot()
+    change_log = bot.run_bot(keep_open=True)
+    bot.publish_post(change_log)
+
+schedule.every().day.at("07:05").do(run)
+
+while True:
+    schedule.run_pending()
+    time.sleep(1)
