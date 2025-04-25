@@ -887,7 +887,8 @@ class DailyTradeBot(metaclass=AutoPostCallMeta):
 
         # Add title
         title_text = "Allowed Subreddits (and post trends)"
-        title_width, title_height = draw.textsize(title_text, font=title_font)
+        title_bbox = draw.textbbox((0, 0), title_text, font=title_font)
+        title_width = title_bbox[2] - title_bbox[0]
         draw.text(((img_width - title_width) // 2, 10), title_text, fill="black", font=title_font)
         
         # Populate the image
