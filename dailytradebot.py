@@ -1134,7 +1134,7 @@ def run():
     change_log = bot.run_bot(keep_open=True)
     bot.publish_post(change_log)
 
-schedule.every().day.at("07:05").do(run)
+schedule.every().day.at("07:05", "Europe/Amsterdam").do(run)
 
 while True:
     schedule.run_pending()
