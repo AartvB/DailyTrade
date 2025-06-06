@@ -689,7 +689,7 @@ class DailyTradeBot(metaclass=AutoPostCallMeta):
                 latest_df.loc[latest_df["username"] == row['username'], "gems after interest"] = round(gems-interest)
 
         # Create table image
-        fig, ax = plt.subplots(figsize=(5, 2))  # Adjust size as needed
+        fig, ax = plt.subplots(figsize=(5, 3))  # Adjust size as needed
         fig.patch.set_facecolor('white')  # Ensure full white background
         ax.set_facecolor('white')  # Set axis background to white
         ax.set_title("Gems", fontsize=14, fontweight="bold", pad=15)  # **Title**
@@ -793,7 +793,7 @@ class DailyTradeBot(metaclass=AutoPostCallMeta):
         df = df.sort_values(['virtual worth', 'username'], ascending = False)
             
         # Create table image
-        fig, ax = plt.subplots(figsize=(5, 2))  # Adjust size as needed
+        fig, ax = plt.subplots(figsize=(5, 3))  # Adjust size as needed
         fig.patch.set_facecolor('white')  # Ensure full white background
         ax.set_facecolor('white')  # Set axis background to white
         ax.set_title("Virtual worth (gems + current stock value)", fontsize=14, fontweight="bold", pad=15)  # **Title**
