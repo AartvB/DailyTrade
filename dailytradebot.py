@@ -688,6 +688,12 @@ class DailyTradeBot(metaclass=AutoPostCallMeta):
                 gems = self.current_gems(row['username'])
                 latest_df.loc[latest_df["username"] == row['username'], "gems after interest"] = round(gems-interest)
 
+        # Format gems columns with comma
+        if 'gems' in latest_df.columns:
+            latest_df['gems'] = latest_df['gems'].apply(lambda x: f"{int(x):,}" if pd.notnull(x) else '')
+        if 'gems after interest' in latest_df.columns:
+            latest_df['gems after interest'] = latest_df['gems after interest'].apply(lambda x: f"{int(x):,}" if pd.notnull(x) and str(x).replace('-', '').isdigit() else x)
+
         # Create table image
         fig, ax = plt.subplots(figsize=(5, 3))  # Adjust size as needed
         fig.patch.set_facecolor('white')  # Ensure full white background
@@ -723,33 +729,61 @@ class DailyTradeBot(metaclass=AutoPostCallMeta):
             df['current rate'] = str(5)
         else:        
             j = [0]
-        
             df['current rate'] = [[print(f"row {j[0]+1} out of {len(df)}."), self.increase_counter(j), self.get_current_rate(row['username'], row['subreddit'], row['amount'], row['value'])][2]
                 for i, row in df.iterrows()]
 
         df['value'] = df['value'].round(5)
         df = df.rename(columns = {'value':'gems/post/stock'})
 
-        # Create table image
-        fig, ax = plt.subplots(figsize=(9, 4))  # Adjust size as needed (last number is height) 
-        fig.patch.set_facecolor('white')  # Ensure full white background
-        ax.set_facecolor('white')  # Set axis background to white
+        # Convert all numbers to string without scientific notation
+        for col in df.columns:
+            if col == 'amount':
+                df[col] = df[col].apply(lambda x: f"{int(x):,}" if pd.notnull(x) else '')
+            elif col == 'current rate':
+                # Try to format as int with comma, fallback to float with comma
+                def format_rate(val):
+                    try:
+                        ival = int(float(val))
+                        if float(val) == ival:
+                            return f"{ival:,}"
+                        else:
+                            return f"{float(val):,.5f}".rstrip('0').rstrip('.')
+                    except Exception:
+                        return str(val)
+                df[col] = df[col].apply(format_rate)
+            elif df[col].dtype == float or df[col].dtype == int:
+                df[col] = df[col].apply(lambda x: f"{x:.5f}" if isinstance(x, float) else str(x))
+
+        # Calculate column widths dynamically
+        col_widths = []
+        for col in df.columns:
+            max_len = max([len(str(val)) for val in df[col]] + [len(str(col))])
+            col_widths.append(max_len * 0.13)  # 0.13 is an empirical scaling factor for width
+
+        # Create table image with dynamic width
+        total_width = sum(col_widths)
+        fig_width = max(5, total_width)  # Minimum width 5 inches
+        fig, ax = plt.subplots(figsize=(fig_width, 6))  # Height is fixed, width is dynamic
+        fig.patch.set_facecolor('white')
+        ax.set_facecolor('white')
         ax.set_title("Stocks", fontsize=14, fontweight="bold", pad=15)  # **Title**
         ax.axis('tight')
         ax.axis('off')    
         table = ax.table(cellText=df.values, colLabels=df.columns, cellLoc='center', loc='center')
-        
-        # **Format the Table**
+
+        # Set column widths
+        for i, width in enumerate(col_widths):
+            table.auto_set_column_width(i)
+            for j in range(len(df) + 1):  # +1 for header
+                table[j, i].set_width(width)
+
+        # Format the Table
         table.auto_set_font_size(False)
         table.set_fontsize(8)
-        
-        # Make the first row bold
-        for j in range(5):  # 5 columns
+        for j in range(len(df.columns)):
             table[0, j].set_text_props(fontweight="bold")
 
-        # Save image
         plt.savefig("stocks.png", dpi=300, bbox_inches="tight")
-        
         plt.clf()
         plt.close('all')
 
@@ -791,7 +825,11 @@ class DailyTradeBot(metaclass=AutoPostCallMeta):
 
         df['virtual worth'] = df['username'].apply(lambda user: self.get_virtual_worth(user, self.get_today()))
         df = df.sort_values(['virtual worth', 'username'], ascending = False)
-            
+        
+        # Format virtual worth with comma
+        if 'virtual worth' in df.columns:
+            df['virtual worth'] = df['virtual worth'].apply(lambda x: f"{int(x):,}" if pd.notnull(x) else '')
+
         # Create table image
         fig, ax = plt.subplots(figsize=(5, 3))  # Adjust size as needed
         fig.patch.set_facecolor('white')  # Ensure full white background
@@ -968,7 +1006,7 @@ class DailyTradeBot(metaclass=AutoPostCallMeta):
             f"{text}\n\n"
             "---\n"
             "^(These actions were performed automatically by a bot. If you think I made a mistake, respond to this comment. "
-            "This will summon Aart, my creator.)"
+            "This will summon Aart, my creator. The code for this bot is fully open source, and can be found [here](https://github.com/AartvB/DailyTrade).)"
         )
         parts.append(formatted_text)
 
