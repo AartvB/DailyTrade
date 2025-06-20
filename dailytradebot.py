@@ -7,6 +7,8 @@ import shutil
 import matplotlib.pyplot as plt
 from PIL import Image, ImageDraw, ImageFont
 import io
+import os
+
 
 def wrap_method(method):
     def wrapped(self, *args, **kwargs): 
@@ -77,7 +79,7 @@ class DailyTradeBot(metaclass=AutoPostCallMeta):
     def cursor(self):
         self.open_connection()
         return self._cursor
-        
+
     def setup_database(self):
         self.cursor().execute('''
             CREATE TABLE IF NOT EXISTS posts (
@@ -88,7 +90,7 @@ class DailyTradeBot(metaclass=AutoPostCallMeta):
         self.cursor().execute('''
             CREATE TABLE IF NOT EXISTS gems (
                 username TEXT,
-                gems INTEGER,
+                gems TEXT,
                 date DATE,
                 PRIMARY KEY (username, date)
             )
@@ -97,7 +99,7 @@ class DailyTradeBot(metaclass=AutoPostCallMeta):
             CREATE TABLE IF NOT EXISTS stocks (
                 username TEXT,
                 subreddit TEXT,
-                amount INTEGER,
+                amount TEXT,
                 value FLOAT,
                 PRIMARY KEY (username, subreddit)
             )
@@ -106,7 +108,7 @@ class DailyTradeBot(metaclass=AutoPostCallMeta):
             CREATE TABLE IF NOT EXISTS trades (
                 username TEXT,
                 subreddit TEXT,
-                amount INTEGER,
+                amount TEXT,
                 value FLOAT,
                 date DATE,
                 type TEXT,
@@ -116,13 +118,13 @@ class DailyTradeBot(metaclass=AutoPostCallMeta):
         self.cursor().execute('''
             CREATE TABLE IF NOT EXISTS loans (
                 username TEXT PRIMARY KEY,
-                amount INTEGER
+                amount TEXT
             )
         ''')
         self.cursor().execute('''
             CREATE TABLE IF NOT EXISTS loans_backup (
                 username TEXT,
-                amount INTEGER,
+                amount TEXT,
                 type TEXT,
                 date DATE,
                 PRIMARY KEY (username, date, type)
@@ -144,6 +146,23 @@ class DailyTradeBot(metaclass=AutoPostCallMeta):
             )
         ''')
         self.conn().commit()
+
+    def backup_database(self):
+        shutil.copy2('reddit_game.db', f"reddit_game {datetime.now().strftime('%Y-%m-%d %H.%M.%S')}.db")
+        print("Created database backup")
+
+    def restore_latest_backup(self):
+        proceed = input("Do you want to restore the latest backup? (y/n): ").strip().lower()
+        if proceed != 'y':
+            print("Restoration cancelled.")
+
+        backups = [f for f in os.listdir('.') if f.startswith('reddit_game ') and f.endswith('.db')]
+        if not backups:
+            print("No backups found.")
+            return
+        latest_backup = max(backups, key=os.path.getctime)
+        shutil.copy2(latest_backup, 'reddit_game.db')
+        print(f"Database restored from {latest_backup}.")
 
     def isfloat(self, num):
         try:
@@ -220,7 +239,7 @@ class DailyTradeBot(metaclass=AutoPostCallMeta):
             LIMIT 1
         """, (username,))
         gems = self.cursor().fetchone()[0]
-        return gems
+        return int(gems)
     
     def add_gems(self, username, amount):    
         gems = self.current_gems(username)
@@ -391,11 +410,11 @@ class DailyTradeBot(metaclass=AutoPostCallMeta):
         total_amount = 0
         total_gems = 0
         for index, row in stocks.iterrows():
-            print(f"Selling stocks from subreddit {index+1}/{stocks.shape[0]}")
+            row_amount = int(row['amount'])
             number_of_posts = self.get_posts_before_date(row['subreddit'], date, username)
-            gems = round(row['amount']*number_of_posts*row['value'])
+            gems = round(row_amount*number_of_posts*row['value'])
 
-            total_amount += row['amount']
+            total_amount += row_amount
             total_gems += gems
 
             self.add_gems(username, gems)
@@ -404,7 +423,7 @@ class DailyTradeBot(metaclass=AutoPostCallMeta):
                 current_value = 0
             else:
                 current_value = 1/number_of_posts
-            self.cursor().execute("INSERT INTO trades (username, subreddit, amount, value, date, type) VALUES (?, ?, ?, ?, ?, ?)", (username, row['subreddit'], -1*row['amount'], current_value, date, "sale"))
+            self.cursor().execute("INSERT INTO trades (username, subreddit, amount, value, date, type) VALUES (?, ?, ?, ?, ?, ?)", (username, row['subreddit'], -1*row_amount, current_value, date, "sale"))
             self.cursor().execute("DELETE FROM stocks WHERE username = ? AND subreddit = ?", (username, row['subreddit']))
             self.conn().commit()
             
@@ -435,7 +454,8 @@ class DailyTradeBot(metaclass=AutoPostCallMeta):
             AND subreddit = ?
         """, (username,subreddit,))
         number_of_stocks, value = self.cursor().fetchone()
-        
+        number_of_stocks = int(number_of_stocks)
+        value = float(value)
         if amount == "all":
             amount = number_of_stocks
         if not self.isfloat(amount):
@@ -511,7 +531,7 @@ class DailyTradeBot(metaclass=AutoPostCallMeta):
                 SELECT amount FROM loans
                 WHERE username = ?
             """, (username,))
-            current_loan = self.cursor().fetchone()[0]
+            current_loan = int(self.cursor().fetchone()[0])
             self.cursor().execute("UPDATE loans SET amount = ? WHERE username = ?", (current_loan + amount, username))                        
         else:
             self.cursor().execute("INSERT INTO loans (username, amount) VALUES (?, ?)", (username, amount))
@@ -540,7 +560,7 @@ class DailyTradeBot(metaclass=AutoPostCallMeta):
             SELECT amount FROM loans
             WHERE username = ?
         """, (username,))
-        current_loan = self.cursor().fetchone()[0]
+        current_loan = int(self.cursor().fetchone()[0])
 
         if amount == "all":
             amount = current_loan
@@ -622,9 +642,9 @@ class DailyTradeBot(metaclass=AutoPostCallMeta):
         
         for _, row in df.iterrows():
             username = row['username']
-            amount = row['amount']
+            amount = int(row['amount'])
             interest = round(amount*0.05)
-            gems = self.current_gems(username, self.cursor())
+            gems = self.current_gems(username)
             if gems >= interest:
                 self.add_gems(username, interest*-1)
                 messages = self.add_message(messages,username,f"{username} has paid {interest} gems as interest on their loan.")
@@ -647,7 +667,7 @@ class DailyTradeBot(metaclass=AutoPostCallMeta):
         for index, row in df.iterrows():
             print(f"stock {index+1} out of {len(df)}.")
             subreddit = row['subreddit']
-            amount = row['amount']    
+            amount = int(row['amount'])
             value = row['value']
         
             number_of_posts = self.get_posts_before_date(subreddit, date, username)
@@ -729,7 +749,7 @@ class DailyTradeBot(metaclass=AutoPostCallMeta):
             df['current rate'] = str(5)
         else:        
             j = [0]
-            df['current rate'] = [[print(f"row {j[0]+1} out of {len(df)}."), self.increase_counter(j), self.get_current_rate(row['username'], row['subreddit'], row['amount'], row['value'])][2]
+            df['current rate'] = [[print(f"row {j[0]+1} out of {len(df)}."), self.increase_counter(j), self.get_current_rate(row['username'], row['subreddit'], int(row['amount']), row['value'])][2]
                 for i, row in df.iterrows()]
 
         df['value'] = df['value'].round(5)
@@ -1013,8 +1033,7 @@ class DailyTradeBot(metaclass=AutoPostCallMeta):
         return parts
     
     def run_bot(self):        
-        shutil.copy2('reddit_game.db', f"reddit_game {datetime.now().strftime('%Y-%m-%d %H.%M.%S')}.db")
-        print("Created database backup")
+        self.backup_database()
 
         post_id, post_date = self.get_latest_post()
         
