@@ -254,9 +254,9 @@ class DailyTradeBot(metaclass=AutoPostCallMeta):
         today = self.get_today()
 
         if today == last_date:     
-            self.cursor().execute("UPDATE gems SET gems = ? WHERE username = ? AND date = ?", (gems + amount, username, today))
+            self.cursor().execute("UPDATE gems SET gems = ? WHERE username = ? AND date = ?", (str(gems + amount), username, today))
         else:
-            self.cursor().execute("INSERT INTO gems (username, gems, date) VALUES (?, ?, ?)", (username, gems + amount, today))
+            self.cursor().execute("INSERT INTO gems (username, gems, date) VALUES (?, ?, ?)", (username, str(gems + amount), today))
         self.conn().commit()
 
     def has_stocks(self, username, subreddit):
