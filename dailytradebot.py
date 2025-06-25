@@ -695,6 +695,7 @@ class DailyTradeBot(metaclass=AutoPostCallMeta):
         latest_df = df.sort_values(['username', 'date']).groupby('username').last().reset_index()
         latest_df = latest_df.drop('date',axis=1)
 
+        latest_df['gems'] = latest_df['gems'].astype(int)
         latest_df = latest_df.sort_values(['gems', 'username'], ascending = False)
         
         df = pd.read_sql_query("SELECT username, amount FROM loans", self.conn())
