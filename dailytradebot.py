@@ -382,8 +382,8 @@ class DailyTradeBot(metaclass=AutoPostCallMeta):
         
         self.add_gems(username,-1*amount)
         
-        self.cursor().execute("INSERT INTO trades (username, subreddit, amount, value, date, type) VALUES (?, ?, ?, ?, ?, ?)", (username, subreddit, amount, 1/number_of_posts, date, "purchase"))
-        self.cursor().execute("INSERT INTO stocks (username, subreddit, amount, value) VALUES (?, ?, ?, ?)", (username, subreddit, amount, 1/number_of_posts))
+        self.cursor().execute("INSERT INTO trades (username, subreddit, amount, value, date, type) VALUES (?, ?, ?, ?, ?, ?)", (username, subreddit, str(amount), 1/number_of_posts, date, "purchase"))
+        self.cursor().execute("INSERT INTO stocks (username, subreddit, amount, value) VALUES (?, ?, ?, ?)", (username, subreddit, str(amount), 1/number_of_posts))
         self.conn().commit()
         
         post_number_text = f"There have been {number_of_posts} posts (not posted by {username})"
@@ -423,7 +423,7 @@ class DailyTradeBot(metaclass=AutoPostCallMeta):
                 current_value = 0
             else:
                 current_value = 1/number_of_posts
-            self.cursor().execute("INSERT INTO trades (username, subreddit, amount, value, date, type) VALUES (?, ?, ?, ?, ?, ?)", (username, row['subreddit'], -1*row_amount, current_value, date, "sale"))
+            self.cursor().execute("INSERT INTO trades (username, subreddit, amount, value, date, type) VALUES (?, ?, ?, ?, ?, ?)", (username, row['subreddit'], str(-1*row_amount), current_value, date, "sale"))
             self.cursor().execute("DELETE FROM stocks WHERE username = ? AND subreddit = ?", (username, row['subreddit']))
             self.conn().commit()
             
@@ -485,7 +485,7 @@ class DailyTradeBot(metaclass=AutoPostCallMeta):
             current_value = 0
         else:
             current_value = 1/number_of_posts
-        self.cursor().execute("INSERT INTO trades (username, subreddit, amount, value, date, type) VALUES (?, ?, ?, ?, ?, ?)", (username, subreddit, -1*amount, current_value, date, "sale"))
+        self.cursor().execute("INSERT INTO trades (username, subreddit, amount, value, date, type) VALUES (?, ?, ?, ?, ?, ?)", (username, subreddit, str(-1*amount), current_value, date, "sale"))
         if amount == number_of_stocks:   
             self.cursor().execute("DELETE FROM stocks WHERE username = ? AND subreddit = ?", (username, subreddit))
         else:
@@ -524,7 +524,7 @@ class DailyTradeBot(metaclass=AutoPostCallMeta):
         
         self.add_gems(username, amount)
 
-        self.cursor().execute("INSERT INTO loans_backup (username, amount, type, date) VALUES (?, ?, ?, ?)", (username, amount, 'loan', date))
+        self.cursor().execute("INSERT INTO loans_backup (username, amount, type, date) VALUES (?, ?, ?, ?)", (username, str(amount), 'loan', date))
         self.conn().commit()
         if self.has_loan(username):
             self.cursor().execute("""
@@ -532,9 +532,9 @@ class DailyTradeBot(metaclass=AutoPostCallMeta):
                 WHERE username = ?
             """, (username,))
             current_loan = int(self.cursor().fetchone()[0])
-            self.cursor().execute("UPDATE loans SET amount = ? WHERE username = ?", (current_loan + amount, username))                        
+            self.cursor().execute("UPDATE loans SET amount = ? WHERE username = ?", (str(current_loan + amount), username))                        
         else:
-            self.cursor().execute("INSERT INTO loans (username, amount) VALUES (?, ?)", (username, amount))
+            self.cursor().execute("INSERT INTO loans (username, amount) VALUES (?, ?)", (username, str(amount)))
         self.conn().commit()
 
         return f"{username} took a loan of {amount} gems. They will have to pay an interest of {round(amount*0.05)} gems each day."
@@ -575,12 +575,12 @@ class DailyTradeBot(metaclass=AutoPostCallMeta):
         
         self.add_gems(username, amount*-1)
 
-        self.cursor().execute("INSERT INTO loans_backup (username, amount, type, date) VALUES (?, ?, ?, ?)", (username, amount, 'payment', date))
+        self.cursor().execute("INSERT INTO loans_backup (username, amount, type, date) VALUES (?, ?, ?, ?)", (username, str(amount), 'payment', date))
         self.conn().commit()
         if amount == current_loan:
             self.cursor().execute("DELETE FROM loans WHERE username = ?", (username,))
         else:
-            self.cursor().execute("UPDATE loans SET amount = ? WHERE username = ?", (current_loan - amount, username))                        
+            self.cursor().execute("UPDATE loans SET amount = ? WHERE username = ?", (str(current_loan - amount), username))                        
         self.conn().commit()
         
         return f"{username} paid off {amount} gems of their loan. Now {current_loan - amount} gems are left in their loan. They will have to pay an interest of {round((current_loan-amount)*0.05)} gems each day."
@@ -651,9 +651,9 @@ class DailyTradeBot(metaclass=AutoPostCallMeta):
             else:
                 self.add_gems(username, gems*-1)
                 loan_increase = interest - gems
-                self.cursor().execute("INSERT INTO loans_backup (username, amount, type, date) VALUES (?, ?, ?, ?)", (username, loan_increase, 'interest', execution_date))
+                self.cursor().execute("INSERT INTO loans_backup (username, amount, type, date) VALUES (?, ?, ?, ?)", (username, str(loan_increase), 'interest', execution_date))
                 self.conn().commit()
-                self.cursor().execute("UPDATE loans SET amount = ? WHERE username = ?", (amount + loan_increase, username))                        
+                self.cursor().execute("UPDATE loans SET amount = ? WHERE username = ?", (str(amount + loan_increase), username))                        
                 self.conn().commit()
                 messages = self.add_message(messages,username,f"{username} had to pay {interest} gems as interest on their loan. They only had {gems} gems. The rest has been added to their loan. Their loan is now {amount + loan_increase} gems, so they have to pay {round((amount + loan_increase)*0.05)} gems interest per day.")   
         return messages
