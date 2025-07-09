@@ -147,20 +147,32 @@ class DailyTradeBot(metaclass=AutoPostCallMeta):
         ''')
         self.conn().commit()
 
-    def backup_database(self):
-        shutil.copy2('reddit_game.db', f"reddit_game {datetime.now().strftime('%Y-%m-%d %H.%M.%S')}.db")
+    def run_sql_queries(self, queries):
+        for query in queries:
+            self.run_sql_query(query)
+
+    def run_sql_query(self, query):
+        print("Running SQL query:", query)
+        self.cursor(keep_open=True).execute(query)
+        self.conn().commit()
+
+    def backup_database(self, for_restoration=False):
+        addition = " for restoration" if for_restoration else ""
+        shutil.copy2('reddit_game.db', f"reddit_game {datetime.now().strftime('%Y-%m-%d %H.%M.%S')}{addition}.db")
         print("Created database backup")
 
     def restore_latest_backup(self):
         proceed = input("Do you want to restore the latest backup? (y/n): ").strip().lower()
         if proceed != 'y':
             print("Restoration cancelled.")
+            return
 
         backups = [f for f in os.listdir('.') if f.startswith('reddit_game ') and f.endswith('.db')]
         if not backups:
             print("No backups found.")
             return
         latest_backup = max(backups, key=os.path.getctime)
+        self.backup_database(for_restoration=True)
         shutil.copy2(latest_backup, 'reddit_game.db')
         print(f"Database restored from {latest_backup}.")
 
@@ -963,14 +975,17 @@ class DailyTradeBot(metaclass=AutoPostCallMeta):
         # Save or display
         final_img.save("subreddit summary.png")   
 
-    def display_table(self,table_name):
+    def display_table(self,table_name,order_by=None):        
         self.cursor().execute("SELECT name FROM sqlite_master WHERE type='table'")
         tables = self.cursor().fetchall()
         for table in tables:
             if table[0] != table_name:
                 continue
             print(f"Table: {table[0]}")
-            self.cursor().execute(f"SELECT * FROM {table[0]}")
+            if order_by is not None:
+                self.cursor().execute(f"SELECT * FROM {table[0]} ORDER BY {order_by}")
+            else:
+                self.cursor().execute(f"SELECT * FROM {table[0]}")
             rows = self.cursor().fetchall()
             for row in rows:
                 print(row)
@@ -1038,7 +1053,8 @@ class DailyTradeBot(metaclass=AutoPostCallMeta):
 
         post_id, post_date = self.get_latest_post()
         
-        self.get_posts_per_subreddit(post_date)
+        if (datetime.strptime(self.get_today(), "%Y-%m-%d") - datetime.strptime(post_date, "%Y-%m-%d")).days <= 2:
+            self.get_posts_per_subreddit(post_date)
         self.get_posts_per_subreddit(self.get_today())
 
         submission = self.reddit.submission(id=post_id)
