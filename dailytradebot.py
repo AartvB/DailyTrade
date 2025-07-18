@@ -608,7 +608,7 @@ class DailyTradeBot(metaclass=AutoPostCallMeta):
         return f"{username} decided to exit the game. Their information has been deleted. Sorry to see you go. You're always welcome to join and start over again!"
     
     def execute_commands(self, username, commands):
-        if username in ['B0tRank', 'WhyNotCollegeBoard']:
+        if username in ['B0tRank', 'WhyNotCollegeBoard', 'sneakpeekbot']:
             return
         df = pd.DataFrame(columns=["username", "message"])
         if len(commands) == 0:
@@ -727,21 +727,32 @@ class DailyTradeBot(metaclass=AutoPostCallMeta):
         if 'gems after interest' in latest_df.columns:
             latest_df['gems after interest'] = latest_df['gems after interest'].apply(lambda x: f"{int(x):,}" if pd.notnull(x) and str(x).replace('-', '').isdigit() else x)
 
-        # Create table image
-        fig, ax = plt.subplots(figsize=(5, 5))  # Adjust size as needed
-        fig.patch.set_facecolor('white')  # Ensure full white background
+        # Calculate column widths dynamically
+        col_widths = []
+        for col in df.columns:
+            max_len = max([len(str(val)) for val in df[col]] + [len(str(col))])
+            col_widths.append(max_len * 0.13)  # 0.13 is an empirical scaling factor for width
+
+        # Create table image with dynamic width
+        total_width = sum(col_widths)
+        fig_width = max(5, total_width)  # Minimum width 5 inches        fig.patch.set_facecolor('white')  # Ensure full white background
+        fig, ax = plt.subplots(figsize=(fig_width, 3))  # Height is fixed, width is dynamic
         ax.set_facecolor('white')  # Set axis background to white
         ax.set_title("Gems", fontsize=14, fontweight="bold", pad=15)  # **Title**
         ax.axis('tight')
         ax.axis('off')
         table = ax.table(cellText=latest_df.values, colLabels=latest_df.columns, cellLoc='center', loc='center')
         
-        # **Format the Table**
+        # Set column widths
+        for i, width in enumerate(col_widths):
+            table.auto_set_column_width(i)
+            for j in range(len(df) + 1):  # +1 for header
+                table[j, i].set_width(width)
+
+        # Format the Table
         table.auto_set_font_size(False)
         table.set_fontsize(8)
-        
-        # Make the first row bold
-        for j in range(n_columns):  # columns
+        for j in range(len(df.columns)):
             table[0, j].set_text_props(fontweight="bold")
 
         # Save image
@@ -863,21 +874,32 @@ class DailyTradeBot(metaclass=AutoPostCallMeta):
         if 'virtual worth' in df.columns:
             df['virtual worth'] = df['virtual worth'].apply(lambda x: f"{int(x):,}" if pd.notnull(x) else '')
 
-        # Create table image
-        fig, ax = plt.subplots(figsize=(5, 5))  # Adjust size as needed
-        fig.patch.set_facecolor('white')  # Ensure full white background
+        # Calculate column widths dynamically
+        col_widths = []
+        for col in df.columns:
+            max_len = max([len(str(val)) for val in df[col]] + [len(str(col))])
+            col_widths.append(max_len * 0.13)  # 0.13 is an empirical scaling factor for width
+
+        # Create table image with dynamic width
+        total_width = sum(col_widths)
+        fig_width = max(5, total_width)  # Minimum width 5 inches        fig.patch.set_facecolor('white')  # Ensure full white background
+        fig, ax = plt.subplots(figsize=(fig_width, 3))  # Height is fixed, width is dynamic
         ax.set_facecolor('white')  # Set axis background to white
         ax.set_title("Virtual worth (gems + current stock value)", fontsize=14, fontweight="bold", pad=15)  # **Title**
         ax.axis('tight')
         ax.axis('off')
         table = ax.table(cellText=df.values, colLabels=df.columns, cellLoc='center', loc='center')
         
-        # **Format the Table**
+        # Set column widths
+        for i, width in enumerate(col_widths):
+            table.auto_set_column_width(i)
+            for j in range(len(df) + 1):  # +1 for header
+                table[j, i].set_width(width)
+
+        # Format the Table
         table.auto_set_font_size(False)
         table.set_fontsize(8)
-        
-        # Make the first row bold
-        for j in range(2):  # 2 columns
+        for j in range(len(df.columns)):
             table[0, j].set_text_props(fontweight="bold")
 
         # Save image
