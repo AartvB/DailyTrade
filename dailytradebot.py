@@ -728,7 +728,7 @@ class DailyTradeBot(metaclass=AutoPostCallMeta):
             latest_df['gems after interest'] = latest_df['gems after interest'].apply(lambda x: f"{int(x):,}" if pd.notnull(x) and str(x).replace('-', '').isdigit() else x)
 
         # Create table image
-        fig, ax = plt.subplots(figsize=(5, 3))  # Adjust size as needed
+        fig, ax = plt.subplots(figsize=(5, 5))  # Adjust size as needed
         fig.patch.set_facecolor('white')  # Ensure full white background
         ax.set_facecolor('white')  # Set axis background to white
         ax.set_title("Gems", fontsize=14, fontweight="bold", pad=15)  # **Title**
@@ -864,7 +864,7 @@ class DailyTradeBot(metaclass=AutoPostCallMeta):
             df['virtual worth'] = df['virtual worth'].apply(lambda x: f"{int(x):,}" if pd.notnull(x) else '')
 
         # Create table image
-        fig, ax = plt.subplots(figsize=(5, 3))  # Adjust size as needed
+        fig, ax = plt.subplots(figsize=(5, 5))  # Adjust size as needed
         fig.patch.set_facecolor('white')  # Ensure full white background
         ax.set_facecolor('white')  # Set axis background to white
         ax.set_title("Virtual worth (gems + current stock value)", fontsize=14, fontweight="bold", pad=15)  # **Title**
