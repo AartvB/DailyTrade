@@ -8,7 +8,8 @@ import matplotlib.pyplot as plt
 from PIL import Image, ImageDraw, ImageFont
 import io
 import os
-
+import prawcore
+import time
 
 def wrap_method(method):
     def wrapped(self, *args, **kwargs): 
@@ -311,33 +312,41 @@ class DailyTradeBot(metaclass=AutoPostCallMeta):
         elif username is not None:
             raise Exception(f'I cannot find the post count of this subreddit ({subreddit}) and this user ({username}) on this date ({date}) yet!')
 
-        end_date = datetime.strptime(date, "%Y-%m-%d") 
+        nTries = 0
+        while nTries < 20:
+            try:
+                end_date = datetime.strptime(date, "%Y-%m-%d") 
 
-        end_datetime = datetime(end_date.year, end_date.month, end_date.day, 5, 0)
-        start_datetime = end_datetime - timedelta(hours=24)
+                end_datetime = datetime(end_date.year, end_date.month, end_date.day, 5, 0)
+                start_datetime = end_datetime - timedelta(hours=24)
 
-        start_timestamp = int(start_datetime.timestamp())
-        end_timestamp = int(end_datetime.timestamp())
+                start_timestamp = int(start_datetime.timestamp())
+                end_timestamp = int(end_datetime.timestamp())
 
-        # Count the number of posts in the time range
-        post_count = 0
-        
-        if has_been_found:
-            user = self.reddit.redditor(username)
-            for submission in user.submissions.new():
-                if submission.subreddit == subreddit and start_timestamp <= submission.created_utc < end_timestamp:
-                    post_count += 1
-            return n_posts - post_count
-        else:
-            subreddit = self.reddit.subreddit(subreddit)
+                # Count the number of posts in the time range
+                post_count = 0
+                
+                if has_been_found:
+                    user = self.reddit.redditor(username)
+                    for submission in user.submissions.new():
+                        if submission.subreddit == subreddit and start_timestamp <= submission.created_utc < end_timestamp:
+                            post_count += 1
+                    return n_posts - post_count
+                else:
+                    praw_subreddit = self.reddit.subreddit(subreddit)
 
-            # Loop through submissions in the subreddit
-            for submission in subreddit.new(limit=1000):  # Use .new() to iterate through posts
-                if start_timestamp <= submission.created_utc < end_timestamp:
-                    post_count += 1
-                if submission.created_utc < start_timestamp:  # Stop early if past range
-                    break
-            return post_count
+                    # Loop through submissions in the subreddit
+                    for submission in praw_subreddit.new(limit=1000):  # Use .new() to iterate through posts
+                        if start_timestamp <= submission.created_utc < end_timestamp:
+                            post_count += 1
+                        if submission.created_utc < start_timestamp:  # Stop early if past range
+                            break
+                    return post_count
+            except prawcore.exceptions.ServerError:
+                print('Server error occurred, trying again in 10 seconds')
+                time.sleep(10)
+                nTries += 1
+        raise Exception('20 server errors occured!')
 
     def allowed_subreddits(self):
         words = ['dailygames','notinteresting', 'learnpython', 'mildlyinfuriating', '196', '3Blue1Brown', 'AmIOverreacting', 'AmITheAsshole', 'Angryupvote', 'Animal', 'animation', 'antimeme', 'anythingbutmetric', 'AskOuija', 'assholedesign', 'BeAmazed', 'birdification', 'birthofasub', 'blursedimages', 'brandnewsentence', 'capybara', 'chemistrymemes', 'clevercomebacks', 'confidentlyincorrect', 'copypasta', 'countablepixels', 'Damnthatsinteresting', 'dataisbeautiful', 'DnD', 'dndmemes', 'ExplainTheJoke', 'facepalm', 'Fantasy', 'foundsatan', 'foundthemobileuser', 'FreeCompliments', 'gameofthrones', 'geocaching', 'girlsarentreal', 'GuysBeingDudes', 'iamverysmart', 'ididnthaveeggs', 'ihadastroke', 'im14andthisisdeep', 'interesting', 'interestingasfuck', 'LeftTheBurnerOn', 'LetGirlsHaveFun', 'lfg', 'lgbt', 'lies', 'linguisticshumor', 'LinkedInLunatics', 'lostredditors', 'MadeMeSmile', 'mapporncirclejerk', 'MathJokes', 'mathmemes', 'meirl', 'meme', 'memes', 'mildlyinteresting', 'MurderedByWords', 'nature', 'Nicegirls', 'NoahGetTheBoat', 'NonPoliticalTwitter', 'oddlyspecific', 'offmychest', 'onejob', 'penpals', 'PeterExplainsTheJoke', 'pettyrevenge', 'physicsmemes', 'politics', 'PrematureTruncation', 'rareinsults', 'rpg', 'screenshotsarehard', 'softwaregore', 'sssdfg', 'SUBREDDITNAME', 'technicallythetruth', 'teenagersbutbetter', 'thatHappened', 'theydidthemath', 'Tinder', 'trolleyproblem', 'TwoSentenceHorror', 'vexillologycirclejerk', 'circlejerk', 'WeirdEggs', 'Whatcouldgowrong', 'whatisthisthing', 'woosh', 'wordle', 'AnarchyChess', 'shittydarksouls', 'KitchenConfidential', 'CountOnceADay', 'countwithchickenlady', 'SquaredCircle', 'chess', 'Warhammer40k', 'PrimarchGFs', 'SpeedOfLobsters']
@@ -1096,7 +1105,7 @@ class DailyTradeBot(metaclass=AutoPostCallMeta):
             if ignore_comment:
                 continue
 
-            print("Working on comment:\n" + comment.body)
+            print("Working on comment by " + comment.author.name + ":\n" + comment.body)
 
             df = pd.concat([df, self.execute_commands(comment.author.name,self.extract_commands(comment.body))], ignore_index=True)
             print("\n")
@@ -1113,11 +1122,12 @@ class DailyTradeBot(metaclass=AutoPostCallMeta):
         
         print('\n\n\n\n\n\n\n CHANGELOG')
         print(change_log)
-        print("finished!")
+        print("Finished applying commands!")
 
         return change_log
     
     def publish_post(self, change_log):
+        print("Publishing post...")
         explanation_text = '''You are looking at the first fully bot-run daily game: **DailyTrade**!\n\n
 **How It Works**\n\n
 The rules may seem complicated, but it’s actually pretty simple.\n\n
