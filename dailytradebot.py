@@ -716,9 +716,7 @@ class DailyTradeBot(metaclass=AutoPostCallMeta):
         latest_df = df.sort_values(['username', 'date']).groupby('username').last().reset_index()
         latest_df = latest_df.drop('date',axis=1)
 
-        latest_df['gems'] = latest_df['gems'].astype(int)
-        latest_df = latest_df.sort_values(['gems', 'username'], ascending = False)
-        
+        latest_df = latest_df.sort_values(by="gems", key=lambda s: s.str.lstrip('0').replace('', '0').map(lambda x: (len(x), x)), ascending = False)        
         df = pd.read_sql_query("SELECT username, amount FROM loans", self.conn())
 
         n_columns = 2
@@ -732,9 +730,9 @@ class DailyTradeBot(metaclass=AutoPostCallMeta):
 
         # Format gems columns with comma
         if 'gems' in latest_df.columns:
-            latest_df['gems'] = latest_df['gems'].apply(lambda x: f"{int(x):,}" if pd.notnull(x) else '')
+            latest_df['gems'] = latest_df['gems'].apply(lambda s: ','.join([s[max(i - 3, 0):i] for i in range(len(s), 0, -3)][::-1]))
         if 'gems after interest' in latest_df.columns:
-            latest_df['gems after interest'] = latest_df['gems after interest'].apply(lambda x: f"{int(x):,}" if pd.notnull(x) and str(x).replace('-', '').isdigit() else x)
+            latest_df['gems after interest'] = latest_df['gems after interest'].apply(lambda s: ','.join([s[max(i - 3, 0):i] for i in range(len(s), 0, -3)][::-1]))
 
         # Calculate column widths dynamically
         col_widths = []
