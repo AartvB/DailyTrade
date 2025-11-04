@@ -392,10 +392,12 @@ class DailyTradeBot(metaclass=AutoPostCallMeta):
         """, (username,subreddit,date,"purchase",))
         has_already_bought_today = self.cursor().fetchone() is not None
             
+        total_text = ""
         if has_already_bought_today:
             return f"{username} tried to buy stocks from r/{subreddit}, but has already done so below the same post. This is not possible, so the purchase has been cancelled."    
         if amount > gems:
-            return f"{username} tried to buy {amount} stocks from r/{subreddit}, but only had {gems} gems. The purchase has been cancelled."
+            total_text = f"{username} tried to buy {amount} stocks from r/{subreddit}, but only had {gems} gems. The purchase has been cancelled. Only {gems} stocks were bought.\n\n"
+            amount = gems
         if self.has_stocks(username, subreddit):
             return f"{username} tried to buy stocks from r/{subreddit}, but already has stocks from this subreddit. The purchase has been cancelled."
         if number_of_posts == 0:
@@ -411,7 +413,7 @@ class DailyTradeBot(metaclass=AutoPostCallMeta):
         if number_of_posts == 1:
             post_number_text = f"There has been 1 post (not posted by {username})"
 
-        return f"{username} bought {amount} stocks from r/{subreddit}. {post_number_text}, so that means each post is worth {1/number_of_posts:.5f} gems per stock."
+        return total_text + f"{username} bought {amount} stocks from r/{subreddit}. {post_number_text}, so that means each post is worth {1/number_of_posts:.5f} gems per stock."
     
     def sell_all(self, username, date):
         self.cursor().execute("""
@@ -482,8 +484,10 @@ class DailyTradeBot(metaclass=AutoPostCallMeta):
         if not self.isfloat(amount):
             return f"{username} tried to sell {amount} stocks from r/{subreddit}, but this is not a whole number. The sale has been cancelled."    
         amount = int(amount)
+        total_text = ""
         if amount > number_of_stocks:
-            return f"{username} tried to sell {amount} stocks from r/{subreddit}, but does only own {number_of_stocks} stocks. The sale has been cancelled."
+            total_text = f"{username} tried to sell {amount} stocks from r/{subreddit}, but does only own {number_of_stocks} stocks. All stocks of this subreddit will be sold.\n\n"        
+            amount = number_of_stocks
 
         self.cursor().execute("""
             SELECT 1 FROM trades
@@ -525,7 +529,7 @@ class DailyTradeBot(metaclass=AutoPostCallMeta):
         post_number_text = f"There have been {number_of_posts} posts (not posted by {username})."
         if number_of_posts == 1:
             post_number_text = f"There has been 1 post (not posted by {username})."
-        return f"{username} sold {amount} stocks from r/{subreddit}. {post_number_text} Each post was worth {value:.5f} gems per stock. This means that this sale gave {username} {gems} gems." + end_of_message
+        return total_text + f"{username} sold {amount} stocks from r/{subreddit}. {post_number_text} Each post was worth {value:.5f} gems per stock. This means that this sale gave {username} {gems} gems." + end_of_message
     
     def loan(self, username, amount, date):
         if not self.isfloat(amount):
@@ -606,7 +610,7 @@ class DailyTradeBot(metaclass=AutoPostCallMeta):
         
         return f"{username} paid off {amount} gems of their loan. Now {current_loan - amount} gems are left in their loan. They will have to pay an interest of {round((current_loan-amount)*0.05)} gems each day."
     
-    def exit(self, username):
+    def exit_game(self, username):
         self.cursor().execute("DELETE FROM gems WHERE username = ?", (username,))
         self.cursor().execute("DELETE FROM stocks WHERE username = ?", (username,))
         self.cursor().execute("DELETE FROM trades WHERE username = ?", (username,))
@@ -641,7 +645,7 @@ class DailyTradeBot(metaclass=AutoPostCallMeta):
                 result = self.pay(username, row['amount'], self.get_today())
                 df = self.add_message(df,username,result)
             elif row['command'] == 'exit':
-                result = exit(username)
+                result = self.exit_game(username)
                 df = self.add_message(df,username,result)            
             elif row['command'] is None:
                 result = self.unknown_command(username, row['unrecognized'])
