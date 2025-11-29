@@ -12,4 +12,4 @@ schedule.every().day.at("07:05", "Europe/Amsterdam").do(run)
 
 while True:
     schedule.run_pending()
-    time.sleep(1)
+    time.sleep(60*60*2) # Try again after 2 hours

@@ -206,19 +206,19 @@ class DailyTradeBot(metaclass=AutoPostCallMeta):
         text = text.replace("\\","")
         commands = []
 
-        pattern = re.compile(r'\[\s*(sell|buy)\s+(\d+|all)(?:\s+r/(\w+))?\s*\]|\[\s*(loan|pay)\s+(\d+|all)\s*\]|\[\s*(exit)\s*\]|\[(.*?)\]')
+        pattern = re.compile(r'\[\s*(sell|buy)\s+([\d\.,]+|all)(?:\s+r/(\w+))?\s*\]|\[\s*(loan|pay)\s+([\d\.,]+|all)\s*\]|\[\s*(exit)\s*\]|\[(.*?)\]')
         for match in pattern.finditer(text.lower()):
             if match.group(1):  # sell or buy
                 commands.append({
                     'command': match.group(1),
-                    'amount': match.group(2),
+                    'amount': re.sub(r"[\.,]", "", match.group(2)),
                     'subreddit': match.group(3),
                     'unrecognized': None
                 })
             elif match.group(4):  # loan or pay
                 commands.append({
                     'command': match.group(4),
-                    'amount': match.group(5),
+                    'amount': re.sub(r"[\.,]", "", match.group(5)),
                     'subreddit': None,
                     'unrecognized': None
                 })
@@ -728,9 +728,9 @@ class DailyTradeBot(metaclass=AutoPostCallMeta):
             latest_df["gems after interest"] = "-"
             n_columns = 3
             for _, row in df.iterrows():
-                interest = round(row['amount']*0.05)
+                interest = round(float(row['amount'])*0.05)
                 gems = self.current_gems(row['username'])
-                latest_df.loc[latest_df["username"] == row['username'], "gems after interest"] = round(gems-interest)
+                latest_df.loc[latest_df["username"] == row['username'], "gems after interest"] = str(round(gems-interest))
 
         # Format gems columns with comma
         if 'gems' in latest_df.columns:
@@ -838,7 +838,7 @@ class DailyTradeBot(metaclass=AutoPostCallMeta):
         for j in range(len(df.columns)):
             table[0, j].set_text_props(fontweight="bold")
 
-        plt.savefig("stocks.png", dpi=300, bbox_inches="tight")
+        plt.savefig("stocks.png", dpi=200, bbox_inches="tight")
         plt.clf()
         plt.close('all')
 
